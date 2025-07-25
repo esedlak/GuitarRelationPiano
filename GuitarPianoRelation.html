@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar &amp; Piano Fretboard UI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f7f7f7;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+    }
+    /* Piano keyboard styling */
+    .piano {
+      position: relative;
+      width: 100%;
+      max-width: 1000px;
+      height: 180px;
+      display: flex;
+      gap: 0; /* remove gaps between octave groups */
+    }
+    .octave {
+      position: relative;
+      display: flex;
+      width: 20%;
+      height: 100%;
+    }
+    .white-key {
+      position: relative;
+      width: calc(100% / 7);
+      height: 100%;
+      /* Frame lines for each white key in black */
+      border: 1px solid #000;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .white-key span {
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #333;
+      text-align: center;
+    }
+    .black-key {
+      position: absolute;
+      width: calc(100% / 14);
+      height: 60%;
+      background: #000;
+      z-index: 2;
+      /* Use black border to match the white keys' frames */
+      border: 1px solid #000;
+      color: #fff;
+    }
+
+    /* Darker colour variants for black keys by octave */
+    .black-key.octave-1 { background-color: #b96f6f; }
+    .black-key.octave-2 { background-color: #6fb96f; }
+    .black-key.octave-3 { background-color: #6f6fb9; }
+    .black-key.octave-4 { background-color: #b9b96f; }
+    .black-key.octave-5 { background-color: #b96fb9; }
+    .black-key.octave-6 { background-color: #6fb9b9; }
+
+    /* Highlight active notes */
+    .note-active.white-key {
+      background-color: #ffe680;
+    }
+    .note-active.black-key {
+      background-color: #b8860b;
+    }
+    /* Positions will be set via inline style in JavaScript */
+    .black-key span {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #000;
+      text-align: center;
+      line-height: 1.1;
+    }
+    .white-key span sub,
+    .black-key span sub {
+      font-size: 0.7em;
+    }
+    /* Guitar fretboard styling */
+    .fretboard {
+      overflow-x: auto;
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 1000px;
+    }
+    .fretboard th,
+    .fretboard td {
+      border: 1px solid #ccc;
+      padding: 4px;
+      text-align: center;
+      /* Reduce the minimum width of fret cells to make the overall table narrower */
+      min-width: 35px;
+    }
+    .fretboard th {
+      background-color: #e8e8e8;
+    }
+    .string-label {
+      font-weight: bold;
+      background-color: #f0f0f0;
+      position: sticky;
+      left: 0;
+      z-index: 3;
+    }
+    .string-label select {
+      width: 100%;
+      padding: 4px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      /* Increase the min-width of the tuning dropdown so sharp/flat notes fit */
+      min-width: 100px;
+    }
+
+    /* Octave color classes */
+    .octave-1 { background-color: #f9c9c9; }
+    .octave-2 { background-color: #c9f9c9; }
+    .octave-3 { background-color: #c9c9f9; }
+    .octave-4 { background-color: #f9f9c9; }
+    .octave-5 { background-color: #f9c9f9; }
+    .octave-6 { background-color: #c9f9f9; }
+
+    /* When highlighting piano keys, combine note-active with octave color */
+    .white-key.note-active.octave-1 { background-color: #f9c9c9; }
+    .white-key.note-active.octave-2 { background-color: #c9f9c9; }
+    .white-key.note-active.octave-3 { background-color: #c9c9f9; }
+    .white-key.note-active.octave-4 { background-color: #f9f9c9; }
+    .white-key.note-active.octave-5 { background-color: #f9c9f9; }
+    .white-key.note-active.octave-6 { background-color: #c9f9f9; }
+    .black-key.note-active.octave-1 { background-color: #b96f6f; }
+    .black-key.note-active.octave-2 { background-color: #6fb96f; }
+    .black-key.note-active.octave-3 { background-color: #6f6fb9; }
+    .black-key.note-active.octave-4 { background-color: #b9b96f; }
+    .black-key.note-active.octave-5 { background-color: #b96fb9; }
+    .black-key.note-active.octave-6 { background-color: #6fb9b9; }
+  </style>
+</head>
+<body>
+  <h1>Guitar Fretboard in Relation to Piano Octaves</h1>
+  <div class="container">
+    <!-- Piano keyboard with 5 octaves -->
+    <div class="piano" id="piano">
+      <!-- Generate 5 octaves of piano keys (C2–B6) and hide keys outside the E2–E6 range -->
+      <script>
+        const pianoEl = document.getElementById('piano');
+        // Each octave has seven white keys and up to five black keys
+        const whiteTemplate = ['C','D','E','F','G','A','B'];
+        const sharpNames    = ['C#','D#','F#','G#','A#'];
+        const flatNames     = ['Db','Eb','Gb','Ab','Bb'];
+        const sharpPositions= [1, 2, 4, 5, 6];
+        const startOctave = 2;
+        const totalOctaves = 5; // Octaves 2–6 inclusive
+        for (let oi = 0; oi < totalOctaves; oi++) {
+          const octaveNumber = startOctave + oi;
+          const octaveDiv = document.createElement('div');
+          octaveDiv.className = 'octave';
+          // Generate white keys for this octave
+          whiteTemplate.forEach(white => {
+            const w = document.createElement('div');
+            w.className = 'white-key';
+            w.dataset.note = white;
+            w.dataset.octave = octaveNumber;
+            // Assign octave background class to color entire octave
+            w.classList.add(`octave-${octaveNumber}`);
+            const label = document.createElement('span');
+            label.innerHTML = `${white}<sub>${octaveNumber}</sub>`;
+            w.appendChild(label);
+            octaveDiv.appendChild(w);
+          });
+          // Generate black keys at the correct positions
+          sharpNames.forEach((sharp, idx) => {
+            const flat = flatNames[idx];
+            const pos = sharpPositions[idx];
+            const b = document.createElement('div');
+            b.className = 'black-key';
+            b.dataset.noteSharp = sharp;
+            b.dataset.noteFlat  = flat;
+            b.dataset.octave    = octaveNumber;
+              // Assign octave background class for consistent coloring
+              b.classList.add(`octave-${octaveNumber}`);
+            // Position black keys relative to the width of seven white keys
+            b.style.left = `calc(100% * ${pos}/7 - (100%/14)/2)`;
+            const label = document.createElement('span');
+            label.innerHTML = `${sharp}<sub>${octaveNumber}</sub><br>${flat}<sub>${octaveNumber}</sub>`;
+            b.appendChild(label);
+            octaveDiv.appendChild(b);
+          });
+          pianoEl.appendChild(octaveDiv);
+        }
+        // No keys are hidden; full range C2–B6 is displayed
+      </script>
+    </div>
+
+    <!-- Guitar fretboard with 6 strings and 24 frets -->
+    <table class="fretboard">
+      <thead>
+        <tr>
+          <th></th>
+          <!-- Generate fret numbers 0–24 without prefix -->
+          <script>
+            let headerRow = '';
+            for (let f = 0; f <= 24; f++) {
+              headerRow += `<th>${f}</th>`;
+            }
+            document.write(headerRow);
+          </script>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Generate 6 strings: rows -->
+        <script>
+          // Notes available for tuning selections
+          const allNotes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+          // Default tuning from string 1 (highest) to string 6 (lowest)
+          const defaultTuning = ['E','B','G','D','A','E'];
+          for (let s = 1; s <= 6; s++) {
+            let row = '<tr>';
+            // Index for default tuning array (0 = string1)
+            const idx = s - 1;
+            // Build select element for tuning
+            let selectHtml = `<select id="string${s}-tuning" class="string-select">`;
+            allNotes.forEach(note => {
+              const selected = note === defaultTuning[idx] ? ' selected' : '';
+              selectHtml += `<option value="${note}"${selected}>${note}</option>`;
+            });
+            selectHtml += '</select>';
+            row += `<th class="string-label">${selectHtml}</th>`;
+            for (let f = 0; f <= 24; f++) {
+              row += '<td data-string="' + s + '" data-fret="' + f + '"></td>';
+            }
+            row += '</tr>';
+            document.write(row);
+          }
+        </script>
+      </tbody>
+    </table>
+    <script>
+      // Music note definitions and utilities for fretboard generation
+      const NOTE_LIST = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      function noteIndex(note) {
+        return NOTE_LIST.indexOf(note);
+      }
+      function generateFretboard(tuning, frets = 24) {
+        const fretboard = [];
+        tuning.forEach(openNote => {
+          const openIdx = noteIndex(openNote);
+          const stringNotes = [];
+          for (let fret = 0; fret <= frets; fret++) {
+            const noteName = NOTE_LIST[(openIdx + fret) % NOTE_LIST.length];
+            stringNotes.push(noteName);
+          }
+          fretboard.push(stringNotes);
+        });
+        return fretboard;
+      }
+      function updateFretboard() {
+        // Collect selected notes from tuning selectors (string 1 upward to 6)
+        const tuning = [];
+        for (let s = 1; s <= 6; s++) {
+          const sel = document.getElementById(`string${s}-tuning`);
+          if (sel) tuning.push(sel.value);
+        }
+        // Base octaves for strings 1->6 (standard tuning: E4, B3, G3, D3, A2, E2)
+        const baseOctaves = [4, 3, 3, 3, 2, 2];
+        // Mapping of active notes to a set of octaves
+        const activeMap = {};
+        // Iterate strings (tuning array order: string1 to string6)
+        tuning.forEach((openNote, idx) => {
+          let noteName = openNote;
+          let octave   = baseOctaves[idx];
+          let nIdx     = noteIndex(openNote);
+          const stringNumber = idx + 1;
+          for (let fret = 0; fret <= 24; fret++) {
+            const cell = document.querySelector(`td[data-string='${stringNumber}'][data-fret='${fret}']`);
+            if (cell) {
+              // Display octave numbers as subscript in the guitar table
+              cell.innerHTML = `${noteName}<sub>${octave}</sub>`;
+              cell.classList.remove('octave-1','octave-2','octave-3','octave-4','octave-5','octave-6');
+              cell.classList.add(`octave-${octave}`);
+              if (!activeMap[noteName]) activeMap[noteName] = new Set();
+              activeMap[noteName].add(octave);
+            }
+            nIdx = (nIdx + 1) % NOTE_LIST.length;
+            if (nIdx === 0) {
+              octave += 1;
+            }
+            noteName = NOTE_LIST[nIdx];
+          }
+        });
+        // Remove previous highlighting on piano keys but retain octave classes
+        document.querySelectorAll('.white-key, .black-key').forEach(key => {
+          key.classList.remove('note-active');
+        });
+        // Highlight piano keys based on active notes and their octaves
+        Object.keys(activeMap).forEach(note => {
+          const octaves = activeMap[note];
+          octaves.forEach(oct => {
+            // White keys: match note and octave
+            document.querySelectorAll(`.white-key[data-note='${note}'][data-octave='${oct}']`).forEach(k => {
+              k.classList.add('note-active');
+            });
+            // Black keys: match sharp and flat names and octave
+            document.querySelectorAll(`.black-key[data-note-sharp='${note}'][data-octave='${oct}'], .black-key[data-note-flat='${note}'][data-octave='${oct}']`).forEach(k => {
+              k.classList.add('note-active');
+            });
+          });
+        });
+      }
+      // Initialize after DOM content is loaded
+      document.addEventListener('DOMContentLoaded', () => {
+        // Attach change listeners to tuning selectors
+        document.querySelectorAll('.string-select').forEach(sel => {
+          sel.addEventListener('change', updateFretboard);
+        });
+        updateFretboard();
+      });
+    </script>
+  </div>
+</body>
+</html>
